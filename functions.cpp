@@ -28,55 +28,45 @@ void Initialization (double t_0, double t_b, double a, double b) // Task paramet
 
 void Thomas (vector<vector<double>> a, vector<double> b, vector<double> res)
 {
-    // real(8), dimension(0:, :) :: a
-	// real(8), dimension(0:) :: b, res
-	real(8), allocatable :: coef(:,:)
-	real(8) eps
-	integer i, lenght, ier
-	
-	lenght = size(b)
+    vector<vector<double>> coef;
+	double eps;
+	size_t length;
+
+	length = b.size();
 	
 	// Memory allocation for array
 
-	allocate(coef(0:lenght - 2, 0:1), stat = ier); if(ier /= 0) stop 4
-
+    coef.resize(length - 1, std::vector<double>(2));
+	
 	// X_N-2 and Y_N-2 calculation
 
-	coef(lenght - 2, 0) = -a(lenght - 1, 1)/a(lenght - 1, 2)
-	coef(lenght - 2, 1) = b(lenght - 1)/a(lenght - 1, 2)
+	coef[length - 2][0] = -a[length - 1][1] / a[length - 1][2];
+	coef[length - 2][1] = b[length - 1] / a[length - 1][2];
 
 	// Straight sweep
 
-	do i = lenght - 3, 0, -1
-
-		if (abs(a(i + 1, 3) * coef(i + 1, 0) + a(i + 1, 2)) < eps) then
+    for (size_t i = length - 3; i >= 0; --i)
+    {
+        if (abs(a[i + 1][3] * coef[i + 1][0] + a[i + 1][2]) < eps)
+		    cout << "Have not any results, or infinitely many results" << '\n';
 		
-			write(*,*) "Have not any results, or infinitely many results"; stop 10
-			
-		endif
-		
-		coef(i,0) = -a(i + 1, 1)/(a(i + 1, 3) * coef(i + 1, 0) + a(i + 1, 2))
-		coef(i,1) = (b(i + 1) - (a(i + 1, 3) * coef(i + 1, 1)))/(a(i + 1, 3) * coef(i + 1, 0) + a(i + 1, 2))
-
-	enddo
+		coef[i][0] = -a[i + 1][1] / (a[i + 1][3] * coef[i + 1][0] + a[i + 1][2]);
+		coef[i][1] = (b[i + 1] - (a[i + 1][3] * coef[i + 1][1])) / \
+                     (a[i + 1][3] * coef[i + 1][0] + a[i + 1][2]);
+    }
 	
 	// U_0 calculation
-	if (abs(a(0,2) + a(0,3) * coef(0,0)) < eps) then
-		
-			write(*,*) "Have not any results, or infinitely many results"; stop 20
-			
-	endif
-	res(0) = (b(0) - a(0,3) * coef(0,1))/ (a(0,2) + a(0,3) * coef(0,0))
+	if (abs(a[0][2] + a[0][3] * coef[0][0]) < eps)		
+		cout << "Have not any results, or infinitely many results" << '\n';
+
+	res[0] = (b[0] - a[0][3] * coef[0][1]) / (a[0][2] + a[0][3] * coef[0][0]);
 	
 	// Reverse sweep
 
-	do i = 1, lenght - 1
-
-		res(i) = coef(i - 1, 0) * res(i - 1) + coef(i - 1, 1)
-
-	enddo
-
-	deallocate(coef, stat = ier); if(ier /= 0) stop 5
+    for (size_t i = 1; i <= length - 1; ++i)
+    {
+        res[i] = coef[i - 1][0] * res[i - 1] + coef[i - 1][1];
+    }
 }
 
 void Set_IC (vector<vector<vector<double>>> u, double t_0, double t_b)
@@ -140,11 +130,28 @@ void Step (vector<vector<vector<double>>> u, double dt, double dx, double dy)
 		
 		b[0] = 0;
 		b[r - 1] = 0;
-		
-		call Thomas(a, b, u(2:r+1,j,2)); // ???
+
+        vector<double> tmp_vec;
+
+        for (size_t i = 2; i <= r + 1; ++i)
+        {
+            tmp_vec.push_back(u[i][j][2]);
+        }
+
+        Thomas (a, b, tmp_vec);
     }
 	
-	Set_BC (u(:,:,2)); // Refresh BC
+    vector<vector<double>> tmp_2vec;
+
+    for (size_t i = 0; i < u.size(); ++i)
+    {
+        for (size_t j = 0; j < u[0].size(); ++j)
+        {
+            tmp_2vec[i][j] = u[i][j][2];
+        }
+    }
+
+	Set_BC (tmp_2vec); // Refresh BC
 	
 	
 	// Stage 2
@@ -180,25 +187,53 @@ void Step (vector<vector<vector<double>>> u, double dt, double dx, double dy)
 		
 		b[0] = 25.0;
 		b[r - 1] = 25.0;
-		
-		call Thomas(a, b, u(i,2:r+1,3)); // ???
+
+        vector<double> tmp_vect;
+
+        for (size_t j = 2; j <= r + 1; ++j)
+        {
+            tmp_vect.push_back(u[i][j][3]);
+        }
+
+        Thomas (a, b, tmp_vect);
     }
 	
-	Set_BC (u(:,:,3)); // Refresh BC
+    vector<vector<double>> tmp_2vect;
+
+    for (size_t i = 0; i < u.size(); ++i)
+    {
+        for (size_t j = 0; j < u[0].size(); ++j)
+        {
+            tmp_2vect[i][j] = u[i][j][3];
+        }
+    }
+
+	Set_BC (tmp_2vect); // Refresh BC
 }
 
 void Set_BC (vector<vector<double>> u)
 {
-    // u(1,:) = 0;
-    // u(r+2,:) = 0
+    // for (size_t i = 0; i < u[0].size(); ++i)
+    //     u[0][i] = 0;
+    // fill(u[r + 2].begin(), u[r + 2].end(), 0);
 	
-	u(1,:) = u(2,:);
-    u(r + 2, :) = u(r + 1, :);
+	for (size_t i = 0; i < u[0].size(); ++i)
+    {
+        u[0][i] = u[1][i];
+    }
+
+    u[r + 2] = u[r + 1];
 }
 
 void Update_IC (vector<vector<vector<double>>> u)
 {
-    u(:,:,1) = u(:,:,3);
+    for (size_t i = 0; i < u.size(); ++i)
+    {
+        for (size_t j = 0; j < u[i].size(); ++j)
+        {
+            u[i][j][0] = u[i][j][2];
+        }
+    }
 }
 
 void Save_Data (vector<vector<vector<double>>> u, int iter)
@@ -226,11 +261,10 @@ void Save_Data (vector<vector<vector<double>>> u, int iter)
 
     for (int i = 2; i <= r + 1; ++i)
     {
-        write(1, *) u(i,:,3);
-        // for (size_t j = 0; j < u[i][0].size(); ++j)
-        // {
-        //     outputFile << u[i][j][2] << " ";
-        // }
+        for (size_t j = 0; j < u[i][0].size(); ++j)
+        {
+            outputFile << u[i][j][2] << " ";
+        }
         outputFile << "\n";
     }
 
